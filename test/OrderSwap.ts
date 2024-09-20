@@ -6,6 +6,11 @@ describe("OrderSwap", function () {
   // We define a fixture to reuse the same setup in every test.
   // We use loadFixture to run this setup once, snapshot that state,
   // and reset Hardhat Network to that snapshot in every test.
+  const amountDeposited = ethers.parseUnits("100", 18);
+  const amountDesired = ethers.parseUnits("10", 18);
+  const trfAmount = ethers.parseUnits("100", 18);
+  const slippageTolerance = 5;
+
   async function deployToken() {
     // string memory _name, string memory _symbol, uint256 _totalSupply
     const name1 = "GuzToken";
@@ -61,142 +66,59 @@ describe("OrderSwap", function () {
     it("Should fail if amount deposited equals zero", async function () {
       const { orderSwap, signer1, tokenA, tokenB } = await loadFixture(deployOrderSwap);
 
-      const amountDeposited = ethers.parseUnits("0", 18);
-      const amountDesired = ethers.parseUnits("10", 18);
-      const trfAmount = ethers.parseUnits("100", 18);
+      const amountDeposit = ethers.parseUnits("0", 18);
 
       await tokenA.transfer(signer1, trfAmount);
       await tokenA.connect(signer1).approve(orderSwap, trfAmount);
-      await expect(orderSwap.connect(signer1).createOrder(tokenA, amountDeposited, tokenB, amountDesired, 1)).to.be.revertedWithCustomError(orderSwap, "AmountMustBeGreaterThanZero");
+      await expect(orderSwap.connect(signer1).createOrder(tokenA, amountDeposit, tokenB, amountDesired, slippageTolerance)).to.be.revertedWithCustomError(orderSwap, "AmountMustBeGreaterThanZero");
     });
 
     it("Should fail if amount desired equals zero", async function () {
         const { orderSwap, signer1, tokenA, tokenB } = await loadFixture(deployOrderSwap);
   
-        const amountDeposited = ethers.parseUnits("10", 18);
-        const amountDesired = ethers.parseUnits("0", 18);
-        const trfAmount = ethers.parseUnits("100", 18);
+        const amountDesire = ethers.parseUnits("0", 18);
   
         await tokenA.transfer(signer1, trfAmount);
         await tokenA.connect(signer1).approve(orderSwap, trfAmount);
-        await expect(orderSwap.connect(signer1).createOrder(tokenA, amountDeposited, tokenB, amountDesired, 1)).to.be.revertedWithCustomError(orderSwap, "AmountMustBeGreaterThanZero");
+        await expect(orderSwap.connect(signer1).createOrder(tokenA, amountDeposited, tokenB, amountDesire, slippageTolerance)).to.be.revertedWithCustomError(orderSwap, "AmountMustBeGreaterThanZero");
       });
 
     it("Should fail if slippage is greater than 10000", async function () {
         const { orderSwap, signer1, tokenA, tokenB } = await loadFixture(deployOrderSwap);
-  
-        const amountDeposited = ethers.parseUnits("10", 18);
-        const amountDesired = ethers.parseUnits("10", 18);
-        const trfAmount = ethers.parseUnits("10", 18);
-  
+        const slippage = 11000;
+
         await tokenA.transfer(signer1, trfAmount);
         await tokenA.connect(signer1).approve(orderSwap, trfAmount);
-        await expect(orderSwap.connect(signer1).createOrder(tokenA, amountDeposited, tokenB, amountDesired, 11000)).to.be.revertedWithCustomError(orderSwap, "InvalidSlippageTolerance");
+        await expect(orderSwap.connect(signer1).createOrder(tokenA, amountDeposited, tokenB, amountDesired, slippage)).to.be.revertedWithCustomError(orderSwap, "InvalidSlippageTolerance");
     });
 
-    it("Should fail if transfer to contract is not successful", async function () {
-        const { orderSwap, signer1, tokenA, tokenB } = await loadFixture(deployOrderSwap);
-  
-        const amountDeposited = ethers.parseUnits("10", 18);
-        const amountDesired = ethers.parseUnits("10", 18);
-        const trfAmount = ethers.parseUnits("10", 18);
-  
+    // it("Should fail if transfer to contract is not successful", async function () {
+    //     const { orderSwap, signer1, tokenA, tokenB } = await loadFixture(deployOrderSwap);
+
+    //     await tokenA.transfer(signer1, trfAmount);
+    //     await tokenA.connect(signer1).approve(orderSwap, amountDeposited);
+    //     await expect(orderSwap.connect(signer1).createOrder(tokenA, amountDeposited, tokenB, amountDesired, slippageTolerance)).to.be.revertedWithCustomError(orderSwap, "TransferFailed");
+    // });
+
+    it("Should create order successfully", async function () {
+        const { orderSwap, owner, signer1, tokenA, tokenB } = await loadFixture(deployOrderSwap);
+    
         await tokenA.transfer(signer1, trfAmount);
+        expect(await tokenA.balanceOf(signer1)).to.equal(trfAmount);
+
         await tokenA.connect(signer1).approve(orderSwap, trfAmount);
-        await expect(orderSwap.connect(signer1).createOrder(tokenA, amountDeposited, tokenB, amountDesired, 11000)).to.be.revertedWithCustomError(orderSwap, "InvalidSlippageTolerance");
+
+        const initialDepositorBalance = await tokenA.balanceOf(signer1);
+        
+        expect(initialDepositorBalance).to.equal(amountDeposited);
+
+        await orderSwap.connect(signer1).createOrder(tokenA, amountDeposited, tokenB, amountDesired, slippageTolerance);
+
+        const finalDepositorBalance = await tokenA.balanceOf(signer1);
+        const finalContractBalance = await tokenA.balanceOf(orderSwap);
+
+        expect(finalDepositorBalance).to.equal(0);
+        expect(finalContractBalance).to.equal(amountDeposited);
     });
   });
-
-//   describe("Approve Transaction", function () {
-//     it("Should check for invalid transaction id", async function () {
-//       const { multisig, signer1, signer2 , token} = await loadFixture(deployMultisig);
-      
-//       const amount = ethers.parseUnits("10", 18);
-//       const tokenAmount = ethers.parseUnits("30", 18);
-  
-//       await token.transfer(signer1.address, tokenAmount);
-//       expect(await token.balanceOf(signer1.address)).to.equal(tokenAmount);
-  
-//       await token.connect(signer1).approve(multisig, amount);
-//       await token.connect(signer1).transfer(multisig, tokenAmount);
-//       expect(await token.balanceOf(multisig)).to.equal(tokenAmount);
-  
-//       await multisig.connect(signer1).transfer(amount, signer1.address, token);
-      
-//       const id = 3;  // An id greater than txCount (should be 1 after the transfer)
-  
-//       await expect(multisig.connect(signer1).approveTx(id)).to.be.revertedWith("invalid tx id");
-//     });
-//   });
-
-//   describe("Update Quorum", function () {
-//     it("Should fail to initiate quorum change if signer's address is not valid", async function () {
-//       const quorum = 5;
-//       const { multisig, signer1, signer2, signer3, token } = await loadFixture(deployMultisig);
-//       // const amount = ethers.parseUnits("10", 18);
-
-//       await expect(multisig.connect(signer3).updateQuorum(quorum)).to.be.revertedWith("invalid signer");
-//     });
-
-//     it("Should fail to initiate quorum change if the quorum is greater than valid signers", async function () {
-//       const quorum = 5;
-//       const { multisig, signer1, signer2, signer3, token } = await loadFixture(deployMultisig);
-//       // const amount = ethers.parseUnits("10", 18);
-
-//       await expect(multisig.connect(signer1).updateQuorum(quorum)).to.be.revertedWith("quorum greater than valid signers");
-//     });
-
-//     it("Should fail to initiate quorum change if the address has already requested change request", async function () {
-//       const quorum = 3;
-//       const { multisig, signer1, signer2, signer3, token } = await loadFixture(deployMultisig);
-//       // const amount = ethers.parseUnits("10", 18);
-
-//       // await expect(multisig.connect(signer1).updateQuorum(quorum)).to.be.revertedWith("quorum greater than valid signers");
-//       await multisig.connect(signer1).updateQuorum(quorum);
-
-//       await expect(multisig.connect(signer1).updateQuorum(quorum)).to.be.revertedWith("quorum change already requested");
-//     });
-
-//     it("Should set quorumChangeRequested value to true", async function () {
-//       const quorum = 3;
-//       const { multisig, signer1, signer2, signer3, token } = await loadFixture(deployMultisig);
-//       // const amount = ethers.parseUnits("10", 18);
-
-//       // await expect(multisig.connect(signer1).updateQuorum(quorum)).to.be.revertedWith("quorum greater than valid signers");
-//       await multisig.connect(signer1).updateQuorum(quorum);
-
-//       expect(await multisig.quorumChangeRequested()).to.be.true;
-//     });
-
-//     it("Should set quorum value to the new quorum value", async function () {
-//       const quorum = 3;
-//       const { multisig, signer1, signer2, signer3, token } = await loadFixture(deployMultisig);
-//       // const amount = ethers.parseUnits("10", 18);
-
-//       // await expect(multisig.connect(signer1).updateQuorum(quorum)).to.be.revertedWith("quorum greater than valid signers");
-//       await multisig.connect(signer1).updateQuorum(quorum);
-
-//       expect((await multisig.pendingQuorumChange()).newQuorum).to.be.equal(quorum);
-//     });
-
-//     it("Should set the number of approvals to one", async function () {
-//       const quorum = 3;
-//       const { multisig, signer1, signer2, signer3, token } = await loadFixture(deployMultisig);
-//       // const amount = ethers.parseUnits("10", 18);
-//       // await expect(multisig.connect(signer1).updateQuorum(quorum)).to.be.revertedWith("quorum greater than valid signers");
-//       await multisig.connect(signer1).updateQuorum(quorum);
-
-//       expect((await multisig.pendingQuorumChange()).approvals).to.be.equal(1);
-//     });
-
-    // it("Should set the value of approvers at the address to", async function () {
-    //   const quorum = 3;
-    //   const { multisig, signer1} = await loadFixture(deployMultisig);
-    //   // const amount = ethers.parseUnits("10", 18);
-    //   // await expect(multisig.connect(signer1).updateQuorum(quorum)).to.be.revertedWith("quorum greater than valid signers");
-    //   await multisig.connect(signer1).updateQuorum(quorum);
-
-    //   expect((await multisig.approvers()).to.be.true;
-    // });
-//   });
 });
