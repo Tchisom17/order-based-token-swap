@@ -80,7 +80,7 @@ contract OrderSwap {
         emit OrderCreated(orderCount, msg.sender, _tokenDeposited, _amountDeposited, _tokenDesired, _amountDesired, _slippageTolerance);
     }
 
-    function fulfillOrder(uint256 _id) external {
+    function confirmOrder(uint256 _id) external {
         Order storage order = orders[_id];
         _validateOrderIsActive(order.isActive);
 
