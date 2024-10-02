@@ -66,7 +66,7 @@ contract OrderSwap {
         _validateSlippageTolerance(_slippageTolerance);
         _validateTransfer(IERC20(_tokenDeposited).transferFrom(msg.sender, address(this), _amountDeposited));
 
-        orderCount++;
+        orderCount += 1;
         orders[orderCount] = Order({
             depositor: msg.sender,
             tokenDeposited: _tokenDeposited,
@@ -85,10 +85,12 @@ contract OrderSwap {
         _validateOrderIsActive(order.isActive);
 
         uint256 fee = (order.amountDesired * feePercentage) / BASIS_POINTS;
-        uint256 minAmountDesired = (order.amountDesired * (BASIS_POINTS- order.slippageTolerance)) / BASIS_POINTS;
+        uint256 minAmountDesired = (order.amountDesired * (BASIS_POINTS - order.slippageTolerance)) / BASIS_POINTS;
+
         _validateSufficientBalance(IERC20(order.tokenDesired).balanceOf(msg.sender), minAmountDesired);
 
         order.isActive = false;
+        
         _validateTransfer(IERC20(order.tokenDesired).transferFrom(msg.sender, order.depositor, order.amountDesired - fee));
         _validateTransfer(IERC20(order.tokenDeposited).transfer(msg.sender, order.amountDeposited));
         _validateTransfer(IERC20(order.tokenDesired).transfer(owner, fee));
